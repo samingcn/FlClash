@@ -1,15 +1,48 @@
-name: Test Workflow
+name: Build FlClash Windows
 
 on:
   workflow_dispatch:
 
 jobs:
-  test:
+  build:
     runs-on: windows-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
-      - name: Hello
-        run: echo Hello GitHub Actions
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Install dependencies
+        run: |
+          choco install innosetup -y
+          choco install mingw -y
+
+      - name: Check environment
+        run: |
+          flutter --version
+          dart --version
+          go version
+          gcc --version
+
+      - name: Build Windows
+        run: dart .\setup.dart windows --arch amd64
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: flclash-windows
+          path: |
+            build/**
+            dist/**
+            release/**
