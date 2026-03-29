@@ -1,0 +1,69 @@
+name: Build FlClash macOS Intel
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-macos-intel:
+    runs-on: macos-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: false
+
+      - name: Show environment
+        run: |
+          flutter --version
+          dart --version
+          go version
+          ruby --version
+          pod --version
+
+      - name: Get Dart/Flutter packages
+        run: flutter pub get
+
+      - name: Precache macOS artifacts
+        run: flutter precache --macos
+
+      - name: Build macOS Intel (retry)
+        shell: bash
+        run: |
+          set -e
+          for i in 1 2 3; do
+            echo "Build attempt $i"
+            if dart ./setup.dart macos --arch amd64; then
+              exit 0
+            fi
+            echo "Build failed, cleaning CocoaPods caches before retry..."
+            rm -rf macos/Pods macos/Podfile.lock ~/Library/Caches/CocoaPods
+            flutter clean
+            flutter pub get
+            sleep 15
+          done
+          echo "Build failed after 3 attempts"
+          exit 1
+
+      - name: Upload macOS Intel artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flclash-macos-intel-amd64
+          path: |
+            build/**
+            dist/**
+            release/**
